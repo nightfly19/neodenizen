@@ -5,6 +5,8 @@ from pathlib import Path
 from time import sleep
 from typing import Any, Dict, List, Optional
 
+import hashlib
+
 import click
 import requests
 from requests.auth import HTTPBasicAuth
@@ -231,7 +233,7 @@ class NeocitiesApi(object):
             logger.error(traceback.format_exc())
             raise e
 
-    def upload_files(self, file_map: Dict[PathType, str]) -> Any:
+    def upload_files(self, file_map: Dict[PathType, str], remote_file_info: Dict[str, dict], check_extensions: bool = False) -> Any:
         """
         Upload local files to your Neocities site.
 
@@ -260,29 +262,46 @@ class NeocitiesApi(object):
         if self.verbose:
             click.echo("Upload files")
 
-        files: Dict[str, bytes] = {}
+        file_queue = []
         for local_path, path_on_server in file_map.items():
-            # check file extension
-            extension = get_extension(Path(local_path))
-            if extension not in VALID_EXTENSIONS:
-                message = f"Skip file '{str(local_path)}' because the extension '{extension}' is not allowed."  # noqa: E501
-                logger.warn(message)
-                click.echo(message)
-                continue
-
-            # read file
-            with open(local_path, mode="rb") as f:
-                files[path_on_server] = f.read()
-                message = f"Correspondence: {str(local_path)} -> {path_on_server}"
-                logger.debug(message)
-                if self.verbose:
+            file_queue.append((local_path, path_on_server))
+        while file_queue:
+            files: Dict[str, bytes] = {}
+            payload_size: int = 0
+            while file_queue and payload_size < 1024**2:
+                local_path, path_on_server = file_queue.pop()
+                # check file extension
+                extension = get_extension(Path(local_path))
+                if check_extensions and extension not in VALID_EXTENSIONS:
+                    message = f"Skip file '{str(local_path)}' because the extension '{extension}' is not allowed."  # noqa: E501
+                    logger.warn(message)
                     click.echo(message)
+                    continue
 
-        if self.verbose:
-            click.echo("Now uploading...")
-        return self._call_api(method="POST", path="/upload", files=files)
+                # read file
+                with open(local_path, mode="rb") as f:
+                    contents = f.read()
+                    if path_on_server in remote_file_info:
+                        sha1_hash = hashlib.sha1(contents).hexdigest()
+                        remote_sha1_hash = remote_file_info[path_on_server]['sha1_hash']
+                        if sha1_hash == remote_sha1_hash:
+                            message = f"Skip file '{str(local_path)}' because remote file matches."  # noqa: E501
+                            logger.debug(message)
+                            click.echo(message)
+                            continue
+                    files[path_on_server] = contents
+                    payload_size += len(contents)
+                    message = f"Correspondence: {str(local_path)} -> {path_on_server}"
+                    logger.debug(message)
+                    if self.verbose:
+                        click.echo(message)
+                print(local_path)
+            if self.verbose:
+                click.echo("Now uploading...")
+            if files:
+                self._call_api(method="POST", path="/upload", files=files)
 
-    def upload_dir(self, dir: PathType, dir_on_server: Optional[str] = None) -> Any:
+    def upload_dir(self, dir: PathType, dir_on_server: Optional[str] = None, prune: bool = False) -> Any:
         """
         Upload a local directory to your Neocities site.
 
@@ -317,7 +336,10 @@ class NeocitiesApi(object):
             if path.is_file():
                 file_map[path] = dir_on_server + str(path.relative_to(dir))
 
-        return self.upload_files(file_map)
+        #print(file_map)
+        all_file_list = self.list_remote_files()
+        relevent_remote_files = { k:v for (k,v) in all_file_list.items() if k.startswith(dir_on_server)}
+        return self.upload_files(file_map, relevent_remote_files)
 
     def _initialize_index_html(self) -> Any:
         if self.verbose:
@@ -397,6 +419,18 @@ class NeocitiesApi(object):
 
         self.delete_files(filenames)
         return self._initialize_index_html()
+
+
+    def list_remote_files(self):
+        remote_files = {}
+
+        file_list_response = self.fetch_file_list()
+        for file_ in file_list_response["files"]:
+            file_path = '/' + file_['path']
+            del file_['path']
+            remote_files[file_path] = file_
+
+        return remote_files
 
     def download_all(self, save_to: PathType) -> None:
         """

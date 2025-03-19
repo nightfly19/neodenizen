@@ -116,6 +116,18 @@ def file_list(path, format):
         text = "\n".join([file["path"] for file in response["files"]])
     click.echo(text)
 
+@cli.command(help="Sync a directory as your Neocities site.")
+@click.argument("dir", nargs=1, type=click.Path(exists=True))
+@click.option(
+    "--dir-on-server",
+    help="Destination directory.",
+    default='/',
+    nargs=1,
+)
+def sync(dir, dir_on_server):
+    api.upload_dir(dir=dir, dir_on_server=dir_on_server, prune=True)
+
+
 
 @cli.command(help="Show information about your Neocities site.")
 @click.option(
