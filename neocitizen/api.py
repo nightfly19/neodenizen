@@ -339,7 +339,22 @@ class NeocitiesApi(object):
         #print(file_map)
         all_file_list = self.list_remote_files()
         relevent_remote_files = { k:v for (k,v) in all_file_list.items() if k.startswith(dir_on_server)}
-        return self.upload_files(file_map, relevent_remote_files)
+        self.upload_files(file_map, relevent_remote_files)
+        remote_files_to_keep = set()
+        for remote_file in file_map.values():
+
+            remote_files_to_keep.add(remote_file)
+            parts = remote_file.split('/')[1:]
+            for span in range(len(parts)):
+                remote_files_to_keep.add("/" + "/".join(parts[:span + 1]))
+        files_to_prune = sorted(
+            set(relevent_remote_files.keys()) - remote_files_to_keep,
+            key = lambda file_: (len(file_.split("/")), file_))
+        while files_to_prune:
+            print(f"{len(files_to_prune)} files left to delete...")
+            to_delete = files_to_prune[:100]
+            del files_to_prune[:100]
+            self.delete_files(to_delete)
 
     def _initialize_index_html(self) -> Any:
         if self.verbose:
