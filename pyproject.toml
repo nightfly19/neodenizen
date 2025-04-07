@@ -1,5 +1,6 @@
 [tool.poetry]
 authors = [
+  "nightfly19 <sage@chickenscripts.com>",
   "poyo46 <poyo4rock@gmail.com>",
 ]
 classifiers = [
@@ -16,13 +17,13 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
 ]
 description = "Python client library for Neocities API"
-homepage = "https://github.com/poyo46/neocitizen"
+homepage = "https://github.com/nightfly19/neodenizen"
 keywords = ["neocities", "api", "cli"]
 license = "Apache-2.0"
-name = "neocitizen"
+name = "neodenizen"
 readme = "README.md"
-repository = "https://github.com/poyo46/neocitizen"
-version = "1.0.0"
+repository = "https://github.com/nightfly19/neodenizen"
+version = "1.0.1"
 
 [tool.poetry.dependencies]
 click = "^8.0.3"
@@ -68,7 +69,7 @@ line_length = 88
 multi_line_output = 3
 
 [tool.poetry.scripts]
-neocitizen = "neocitizen.cli:cli"
+neodenizen = "neodenizen.cli:cli"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
